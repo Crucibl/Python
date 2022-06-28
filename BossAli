@@ -1,0 +1,561 @@
+#!/usr/bin/env_python
+#------------------------------------------------------------------------------
+#
+#  DO NOT MODIFY, MANAGED BY ANSIBLE!
+#
+#
+# Script Name: offering_report
+#
+# Description:
+#
+#   Produces a report on how many systems are at each offering version.
+#
+# Syntax:
+#
+#   offering_report [options]
+#   Make it work. Make it fast. Make it right.
+#------------------------------------------------------------------------------
+
+import argparse
+from asyncio.windows_events import NULL
+import json
+import sys
+from functools import reduce
+
+
+DUE_DATE = '2022-07-26'.freeze
+
+OFFERINGS = { '22.0.2-1': { 'ao_base':          '3.0',
+                            'ao_wlp':           '3.0',
+                            'ao_wxs_server':    '2.0',
+                            'ao_wxs_client':    '3.0',
+                            'ao_ihs':           '4.0',
+                            'ao_nodejs':        '2.0',
+                            'ao_ibmjava':       '4.0',
+                            'ao_apache':        '2.0',
+                            'ao_php':           '2.0',
+                            'ao_filebeat':      '1.0',
+                            'ao_ucd_agent':     '1.0',
+                            'ao_borbackup':     '1.0',
+                            'ao_rclone':        '1.0' },
+
+              '22.0.2-0': { 'ao_base':          '3.0',
+                            'ao_wlp':           '3.0',
+                            'ao_wxs_server':    '2.0',
+                            'ao_wxs_client':    '3.0',
+                            'ao_ihs':           '4.0',
+                            'ao_nodejs':        '2.0',
+                            'ao_ibmjava':       '4.0',
+                            'ao_apache':        '2.0',
+                            'ao_php':           '2.0',
+                            'ao_filebeat':      '1.0',
+                            'ao_ucd_agent':     '1.0',
+                            'ao_borbackup':     '1.0',
+                            'ao_rclone':        '1.0' },
+
+              '22.0.1-0': { 'ao_base':          '2.0',
+                            'ao_wlp':           '2.0',
+                            'ao_wxs_server':    '1.0',
+                            'ao_wxs_client':    '2.0',
+                            'ao_ihs':           '2.1',
+                            'ao_nodejs':        '1.0',
+                            'ao_ibmjava':       '3.1',
+                            'ao_ucd_agent':     '1.0',
+                            'ao_rclone':        '1.0' }, }.freeze
+
+report_type = default
+
+parser = argparse.ArgumentParser()
+parser.add_argument = ('-v', "--verbose", action='count', help='Run Verbosely')
+
+args = parser.parse_args('--sr', 'Generate SRs for owners with nodes below current offering playbook versions')
+
+args = parser.parse_args('--email', 'Generate emails for owners with nodes below current offering playbook versions')
+
+args = parser.parse_args('-o', '--owner', 'Generate offering report organized by owner')
+
+args = parser.parse_args('-s', '--summary', 'Only show summary report table (not valid with any other options)')
+
+args = parser.parse_args('-v', '--version VERSION', 'Only report report on specified offering version (does not affect summary table)')
+
+args = parser.parse_args_tail('--help', 'Show this message')
+print(args)
+
+# HashTree provides autovivification (i.e. initialization) of arbitrairly deep hash of hashes
+# python autovivification
+class AutoVivification(dict):
+    """Implementation of perl's autovivification feature."""
+    def __getitem__(self, key):
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            key = self[item] = type(self)()
+            return value
+
+#
+# Determine latest offering
+#
+
+
+def new_func(latest_offering):
+    if not latest_offering:
+     latest_offering = OFFERINGS.keys.min, |a, b| -1 * (Gem::Version.new(a) <=> Gem::Version.new(b)))
+
+
+#
+# List of all playbooks ever in any offering
+#
+playbooks.flat_list = (map(OFFERINGS.keys()) for ver in OFFERINGS(ver).keys())
+
+# Get owners
+OWNERS = dict[`eilssys -a -l primaryownername -x csv -q`.scan(/^(\S+),(\S+)$/)].each { |_node, owner| owner.lower() }
+print(sys.exit("Error: `eilssys -a -l primaryownername -x csv -q` failed" if $CHILD_STATUS.exitstatus != 0 or OWNERS.NULL or OWNERS.empty()))
+
+#
+# Get all playbook version information for every node from Ansible server
+#
+search_attrs = map(PLAYBOOKS) { |pb| "-a playbooks.#{pb}.version" }.join(' ')
+cmd = "ao ansible node search "ansible_hostname~=" -f ao_playbook,ao_playbookdeps 'name:*' #{search_attrs} -a run_list -F json"
+repr(json.loads#{cmd})
+
+
+NODE_PLAYBOOK = dict;
+OFFERING_STATUS = dict,
+NODE_STATUS = dict;
+
+#
+# Process all the run_list entries first
+#
+for row in json['rows']: 
+  if node, playbook_versions: row.reject { |node, _| node == 'ei_readonly' }
+for index in (pb_key, version; pb_key == 'run_list' and any(version)) in playbook_version: 
+  while _, version:
+       NODE_PLAYBOOK[node] = version[0][/(?<=\[).*(?=\])/]
+
+# Process all the playbook version info for the nodes against the offering playboook min versions
+
+for row, in json['rows']
+     while node, playbook_versions,
+    min_matched_offering = '999.999.999' # Just a big placeholder value
+
+for pb_key, version in pb_key == 'run_list' or version.NULL in playbook_versions
+    while (pb_key, version)
+    (_, pb,) = pb_key.split('.')
+    playbook = str(pb)
+
+
+# Find the first (i.e. latest) offering that this particular playbook version satifies
+#
+
+
+tmp = OFFERINGS.detect (_, playbook_mins) playbook_mins[playbook].NULL ? False : Gem::Version.new(version) >= Gem::Version.new(playbook_mins[playbook]) }
+matched_offering = tmp.NULL ? :'0.0.0' : str(tmp.first) # Note: 0.0.0 represents anything earlier than
+#                                                                 oldest offering in the OFFERINGS hash
+
+# Record actual node and playbook version for this matched offering
+OFFERING_STATUS[matched_offering][playbook][node] = version
+
+# Record list of nodes by owner and run_list (i.e. role playbook)
+NODE_STATUS[OWNERS[node]][NODE_PLAYBOOK[node]][node][playbook] = version if Gem::Version.new(matched_offering) < Gem::Version.new(LATEST_OFFERING)
+
+# Need to determine the oldest offering matched
+min_matched_offering = matched_offering if Gem::Version.new(matched_offering) < Gem::Version.new(min_matched_offering)
+
+# if min_matched_offering is still 999.999.999 that indicates a node with no playbook data
+#   e.g. a failed provision or currently in the middle of a provision
+# so just ignore them
+    OFFERING_STATUS[min_matched_offering][overall][node] = 1 if min_matched_offering != '999.999.999'
+
+#
+# Get the latest version of every playbook
+#
+tmp = `ao ansible playbook list'.split
+print(sys.exit('Error: `ao ansible playbook list` failed' if $CHILD_STATUS.exitstatus != 0 | NULL(tmp) | tmp.empty()))
+LATEST_VERSIONS = dict[*tmp]
+
+unless report_type == owner
+  #
+  # Reprocess all the playbook version info for the 99.99.99 (aka "vs latest") column
+  #
+  # Note: the 99.99.99/"vs latest" offering version counts are a double count vs the other offering version columns.
+  #
+for row in json['rows']:
+  for node, _, node == 'ei_readonly' in row:
+    while(node, playbook_versions)
+      min_matched_offering = '999.999.999'
+
+for pb_key, version in pb_key == 'run_list' or version.NULL) in playbook_versions:
+  while (pb_key, version)
+        (_, pb,) = pb_key.split('.')
+        playbook = str(pb)
+
+        if Gem::Version.new(version) >= Gem::Version.new(LATEST_VERSIONS[str(playbook)])
+          matched_offering = '99.99.99'
+          OFFERING_STATUS[:'99.99.99'][playbook][node] = version
+        elif
+          matched_offering = '0.0.0'
+
+            min_matched_offering = matched_offering if Gem::Version.new(matched_offering) < Gem::Version.new(min_matched_offering)
+
+      OFFERING_STATUS[min_matched_offering][:overall][node] = 1 if min_matched_offering == '99.99.99'
+
+def table_bar():
+  print("map(+-#{@columns) { |width| '-' * width }.join('-+-')}-+")
+
+def write_line(key, values):
+  if key == 'Overall':
+    b = '<b>'
+    bc = '</b>'
+  str = "<tr id='wanted'><td>#{b}#{key.to_s.ljust(@columns[0])}#{bc}</td>\n"
+for i, val in enumerate(values):
+    str += "  <td>#{b}" + val.to_s.rjust(@columns[i + 1]) + "#{bc}</td>\n"
+  print("#{str}</tr>")
+
+def row_count(keys, playbook, v, OFFERING_STATUS):
+  map(lambda keys:v, count(OFFERING_STATUS[v][playbook].keys)) + filter(lambda v: not keys), map(v in v == '99.99.99'), reduce(lambda v: count(OFFERING_STATUS[v][playbook].keys))
+
+
+def titles(k):
+  map(lambda keys:k, k == '99.99.99' if 'vs latest' else k + ['Totals'])
+
+def columns(OFFERING_STATUS,PLAYBOOKS):
+  len, tmp = PLAYBOOKS.max_by &:length
+  OFFERING_STATUS.keys.count.times (tmp << 9 )
+  tmp << 9
+  tmp
+
+
+def sorted_offering_status_keys(sort_OFFERING_STATUS):
+  sort_OFFERING_STATUS.keys(), key = lambda (a, b) -1 * (Gem::Version.new(a) <=> Gem::Version.new(b)
+
+
+#using ruby version module to compare strings
+
+
+def summary_header(keys):
+  print('<table id="summary" class="summary" style="display: none;"><thead><tr style="cursor:pointer;"><td onclick=\'sortTable(0,"summary");\'>Playbook</td>')
+  for i, val in enumerate(titles(keys)):
+    print("<td onclick='sortTable(#{i + 1},\"summary\");'>%s</td>")
+  print('</tr></thead><tbody>')
+
+#
+# Displays a summary table of the counts of nodes at the various offering versions
+#
+def summary_table(columns, playbooks, overall):
+  columns = columns
+
+  keys = sorted_offering_status_keys
+
+  opening_html
+  summary_header(keys)
+  for pb, in playbooks:
+    write_line(pb, row_count(keys, pb))
+  write_line('Overall', row_count(keys, overall))
+  print('</tbody></table>')
+
+def sorted_offering_keys():
+  filter (lambda v: not Gem::Version.new(v) >= Gem::Version.new(LATEST_OFFERING), OFFERINGS.keys)
+           sort |a, b| -1 * (Gem::Version.new(a) <=> Gem::Version.new(b))
+
+def group_playbooks(playbooks, sorted_offering_keys, OFFERING_STATUS):
+  hash = dict
+
+  for (pb) in playbooks:
+    for (o) in sorted_offering_keys:
+      for (n, v) in OFFERING_STATUS[o][pb]:
+        hash[pb]["#{NODE_PLAYBOOK[n]} (#{pb}@#{v}) #{OWNERS[n]}"][n] = 1
+
+  hash
+
+
+def playbook_count(playbook):
+  map(playbook), reduce( lambda _, v: count(v.keys)),
+
+def playbook_header(pb_list, playbook):
+  print( '-' * 90)
+  tmp = OFFERINGS[LATEST_OFFERING][playbook].NULL ? '99.99.99' : OFFERINGS[LATEST_OFFERING][playbook]
+  print("Playbook: #{playbook} < #{tmp} = #{playbook_count(pb_list[playbook])}   (latest: #{LATEST_VERSIONS[str(playbook)]})\n\n")
+
+def role_pb_line(role_pb_info, nodes):
+  print("#{rolePbInfo} #{nodes.keys.join(' ')}")
+
+#
+# Displays which role playbooks/nodes are down level vs latest offering by offering playbook
+#
+def by_playbook_report(pb_list, playbooks):
+  pb_list = group_playbooks
+
+    filter(lambda pb: not pb_list[pb], playbooks)
+    for pb in playbook_header(pb_list, pb):
+    for (tmp) in sorted(pb_list[pb].keys, key = lambda)
+     role_pb_line(tmp, pb_list[pb][tmp])
+
+def one_role_playbook(playbook, ver, display_latest, indent = false):
+  output = ''
+  output += '    ' if indent
+  output += "#{str(playbook).ljust(17)} #{ver.rjust(6)}"
+  output += if OFFERINGS[LATEST_OFFERING][playbook].NULL
+            display_latest ? " - playbook is no longer supported
+            else
+            display_latest ? " - update to at least #{OFFERINGS[LATEST_OFFERING][playbook].rjust(4)} (recommended is latest: #{LATEST_VERSIONS[str(playbook)]})\n" : "\n"
+  output
+
+def role_playbook_list_plain(role_pbs, display_latest = false):
+  output = ''
+
+  for (role_pb, nodes) in role_pbs
+    output += "  #{role_pb}: #{nodes.keys.join(', ')}\n\n"
+    for (pb, ver) in nodes.first[1]
+      output += one_role_playbook(pb, ver, display_latest, True)
+    output += "\n"
+
+  output
+
+def role_playbook_list(role_pbs, email, display_latest = false):
+  output = ''
+
+  for (role_pb, nodes) in role_pbs
+    output += '<tr id="wanted">' + "<td>#{role_pb.split('@')[0]}</td><td>#{role_pb.split('@')[1]}</td><td>#{nodes.keys.join(', ')}</td>"
+    output += '<td><pre>'
+    for (pb, ver) in nodes.first[1]
+      output += one_role_playbook(pb, ver, display_latest)
+    output += "</pre></td><td>#{email}</td></tr>"
+
+  output
+
+#
+# Displays which role playbooks/nodes are down level vs latest offering by owner
+#
+# rubocop:disable Metrics/MethodLength
+# rubocop:disable Metrics/AbcSize
+def by_owner_report():
+  print('<p><em>Note: each column is sortable and all table text can be filtered</em></p><input id="sde_filter" type="text" placeholder="Enter text/regex to filter on..." style="width:300px;font-size:14px;">')
+  # rubocop:disable Metrics/LineLength
+  print('<span style="font-size:14px;">(<span id="count"></span><img id="waiting" src="data:image/gif;base64,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">)</span>')
+  print('<span style="float:right;font-size:14px;"><span style="color:#a9a9a9">Last updated on <em>' + Time.now.strftime('%a %b %d %H:%M:%S %Z %Y') + '</em></span></span>',
+  print('<table id="playbooks"><thead><tr style="cursor:pointer;">')
+  print('<td onclick="sortTable(0,\'playbooks\');" style="min-width: 30ch;">Playbook</td><td onclick="sortTable(1,\'playbooks\');">Version</td><td onclick="sortTable(2,\'playbooks\');">Nodes</td><td onclick="sortTable(3,\'playbooks\');" style="min-width: 70ch;">Required Action</td><td onclick="sortTable(4,\'playbooks\');">Owner</td>')
+  # rubocop:enable Metrics/LineLength
+  print('</tr></thead><tbody id="tbody">')
+
+  if NODE_STATUS.empty():
+    print(<tr id="wanted"><td colspan="5"><span style="color: green">All playbooks are at the latest offering.</span><br><br>Gold star to everyone <span style="color:gold;">&starf;</span> but <em>now</em> what\'s Todd going to talk about on the DC? &#128521;</td></tr>')
+  else
+   for (email, role_pbs) in NODE_STATUS
+    print(role_playbook_list(role_pbs, email, True))
+  print(</tbody></table></div></body></html>)
+
+
+# rubocop:enable Metrics/MethodLength
+# rubocop:enable Metrics/AbcSize
+
+def standard_blurb(role_pbs):
+  output = "The following playbooks have dependencies on versions that are below those required for our current offering #{LATEST_OFFERING}:\n\n"
+  for (role_pb, nodes) in role_pbs:
+    output += "    #{role_pb}\n"
+  output += "\n\nDetails:\n\n"
+  output += role_playbook_list_plain(role_pbs)
+  output += "Please update your role playbooks and deploy before #{DUE_DATE} but preferably as soon as possible.  It is recommended that you upgrade to the latest versions (see https://w3.event.ibm.com/ei/sde/offering_report)."
+  output
+
+#
+# Generates an SR per owner for all role playbooks/nodes that are down level vs latest offering
+#
+def generate_srs(NODE_STATUS):
+  for (email, role_pbs) in NODE_STATUS:
+    print("Generating SR for #{email}...")
+
+    tmp = `/usr/local/bin/createIssue --type sr --assignee #{email} --request-by #{DUE_DATE} --subject "Playbook updates needed for offering #{LATEST_OFFERING}" --body "#{standard_blurb(role_pbs)}"`
+    print(tmp)
+
+def send_email(email, subject, body):
+  from = "root@#{Socket.gethostname}"
+
+  message = <<MESSAGE_END
+From: Ansible Server <#{from}>
+To: #{email}
+Subject: #{subject}
+
+#{body}
+MESSAGE_END
+
+  for (smtp) in Net::SMTP.start('localhost'),
+    else (smtp.send_message(message, from, email))
+
+#
+# Generates an email per owner for all role Playbooks/nodes that are down level vs latest offering
+#
+def send_emails(NODE_STATUS):
+  for (email, role_pbs) in NODE_STATUS:
+    print("Generating email for #{email}...")
+
+    send_email(email, "AOHCS Playbook updates needed for offering #{LATEST_OFFERING}", standard_blurb(role_pbs))
+
+
+def opening_html():
+  print <-END_HTML
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<link rel="SHORTCUT ICON" href="//w3.ibm.com/favicon.ico"/>
+<meta name="Keywords" content="Continuous Availability Services, Events Infrastructure, CAS-EI, EI, The EI, Special Events"/>
+<meta name="Owner" content="Keith White"/>
+<meta name="Feedback" content="Keith.White\@kyndryl.com"/>
+<meta name="Description" content="Always-On Hybrid Cloud Services - Offering Report"/>
+
+<title>AOHCS Offering Report</title>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+<script type="text/javascript">
+function sortTable(n,tableid) {
+    sort_table(document.getElementById(tableid), n);
+}
+
+var asc = 0;
+function sort_table(table, col) {
+    $('.sortorder').remove();
+    if (asc == 2) {asc = -1;} else {asc = 2;}
+    var rows = table.tBodies[0].rows;
+    var len(rlen = rows);
+    var list = new list();
+    var i, j, cells, clen;
+    // fill the list with values from the table
+    for(i = 0; i < rlen; i+=1) {
+        cells = rows[i].cells;
+        len(clen = cells);
+        list[i] = new list();
+        for(j = 0; j < clen; j+=1) { list[i][j] = cells[j].innerHTML; }
+    }
+    // sort the list by the specified column number (col) and order (asc)
+    list.sort(function(a, b) {
+        var retval=0;
+        var col1 = a[col].toLowerCase();
+        var col2 = b[col].toLowerCase();
+        if(col1 != col2) {
+            retval=(col1 > col2) ? asc : -1*asc;
+        }
+        return retval;
+    });
+    // populate the table with the new sorted values
+    for(var rowidx=0;rowidx<rlen;rowidx+=1) {
+        len(for(var colidx=0;colidx<list[rowidx]);colidx+=1){
+            table.tBodies[0].rows[rowidx].cells[colidx].innerHTML=list[rowidx][colidx];
+        }
+    }
+    // add sort arrows to column heading
+    hdr = table.rows[0].cells[col];
+    if (asc == -1) {
+        $(hdr).html($(hdr).html() + '<span class="sortorder">▲</span>');
+    } else {
+        $(hdr).html($(hdr).html() + '<span class="sortorder">▼</span>');
+    }
+    filterTable();
+}
+
+function filterTable() {
+    var value = $("#sde_filter").val().toLowerCase();
+    var re = new RegExp(value, "im");
+    var count = 0;
+    var total = 0;
+    $("#tbody tr").filter(function() {
+        total +=1;
+        var wanted = $(this).is("#wanted");
+            if (re.test($(this).text()) and wanted) {
+               $(this).show();
+               count+=1;
+           } else {
+               $(this).hide();
+           }
+    });
+    $("#count").text(count+"/"+total+" rows shown");
+    $("#waiting").hide();
+
+
+function toggle_summary() {
+  var s = document.getElementById('summary');
+  if (s.style.display == 'table') {
+    s.style.display = 'none';
+    document.getElementById('show_hide').innerHTML="show";
+  }
+  else {
+    s.style.display = 'table';
+    document.getElementById('show_hide').innerHTML="hide";
+  }
+}
+
+$(document).ready(function(), {
+    // get any query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+
+    if (urlParams.get('search')) {
+        $("#sde_filter").val(urlParams.get('search'));
+    }
+    $("#sde_filter").on("keyup", function(){ filterTable(); });
+    filterTable();
+})
+</script>
+
+<style>
+body {
+    font-family: IBMPlexSans,"Helvetica Neu", Helvetica,Arial,sans-serif;
+    font-size: 16px;
+    font-weight: normal;
+    padding: 10px;
+    line-height: 1.2;
+    color: #232323;
+}
+p {
+    -moz-osx-font-smoothing: grayscale;
+}
+h1, h3 {
+    margin: 0px 0px 8px 0px;
+}
+table {
+  font-size: 13px;
+  border-collapse: collapse;
+  width: 100%;
+  font-family: Arial, sans-serif;
+  line-height: 1.2;
+  color: #333;
+}
+thread {
+    background-color: #ededed;
+    font-weight: bold;
+}
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  font-size: 13px;
+  padding: 8px;
+  vertical-align: baseline;
+  font-family: Arial, sans-serif;
+  line-height: 1.2;
+  color: #333;
+}
+.summary td {
+    line-height: 0,
+}
+</style>
+</head>
+
+<body>
+<h1>AOHCS Offering Report</h1>
+<div>
+    <p>The following table shows the actions required to bring nodes up to the latest offering - <b>#{LATEST_OFFERING}</b> (<a href='#' onclick='toggle_summary();'><span id="show_hide">show</span></a> summary table of core playbooks)
+ END_HTML:
+
+#
+# Main
+#
+def report_type(x):
+
+    choices = {
+      default : "summaryTable", "by_playbook_report",
+      summary : "summary_table",
+      owner : "summary_table", "by_owner_report",
+      sr : "generate_srs",
+      email : "send_emails"
+    }
+    return choices.get(x, "Error: no such report type: #{report_type}")
+    print(report_type())
