@@ -1,0 +1,879 @@
+#!/opt/chef/embedded/bin/ruby
+#------------------------------------------------------------------------------
+#
+#  DO NOT MODIFY, MANAGED BY CHEF!
+#
+#
+# Script Name: offering_report
+#
+# Description:
+#
+#   Produces a report on how many systems are at each offering version.
+#
+# Syntax:
+#
+#   offering_report [options]
+#
+#------------------------------------------------------------------------------
+
+require 'optparse'
+require 'json'
+require 'English'
+require 'socket'
+require 'net/smtp'
+
+DUE_DATE = '2022-07-26'.freeze
+
+OFFERINGS = { '22.0.2-1': { 'ei-base':          '18.0',
+                            'ei-wlp':           '29.0',
+                            'ei-wxs-server':    '5.0',
+                            'ei-wxs-client':    '9.0',
+                            'ei-ihs':           '30.0',
+                            'ei-nodejs':        '25.0',
+                            'ao_ibmjava':       '19.0',
+                            'ei-db2-server':    '23.0',
+                            'ei-db2-client':    '3.0',
+                            'ei-wmq-server':    '16.0',
+                            'ei-wmq':           '10.0',
+                            'ei-db2':           '5.0',
+                            'ao_apache':        '16.0',
+                            'ei-percona':       '17.0',
+                            'ei-php':           '10.0',
+                            'ei-ldap':          '18.0',
+                            'ei-haproxy':       '20.0',
+                            'ei-filebeat':      '12.5.5',
+                            'ei-logstash':      '23.0',
+                            'ei-elasticsearch': '14.0',
+                            'ei-cerebro':       '8.0',
+                            'ei-kafka':         '9.0',
+                            'ei-zookeeper':     '8.0',
+                            'ei-lsyncd':        '13.0',
+                            'ei-cloudant':      '13.0',
+                            'ei-borgbackup':    '5.0',
+                            'ei-rclone':        '6.0' },
+
+              '22.0.2-0': { 'ei-base':          '18.0',
+                            'ei-wlp':           '29.0',
+                            'ei-wxs-server':    '5.0',
+                            'ei-wxs-client':    '9.0',
+                            'ei-ihs':           '30.0',
+                            'ei-nodejs':        '25.0',
+                            'ao_ibmjava':       '19.0',
+                            'ei-db2-server':    '23.0',
+                            'ei-db2-client':    '3.0',
+                            'ei-wmq-server':    '16.0',
+                            'ei-wmq':           '10.0',
+                            'ei-db2':           '5.0',
+                            'ao_apache':        '16.0',
+                            'ei-percona':       '17.0',
+                            'ei-php':           '10.0',
+                            'ei-ldap':          '18.0',
+                            'ei-haproxy':       '20.0',
+                            'ei-filebeat':      '12.5',
+                            'ei-logstash':      '23.0',
+                            'ei-elasticsearch': '14.0',
+                            'ei-cerebro':       '8.0',
+                            'ei-kafka':         '9.0',
+                            'ei-zookeeper':     '8.0',
+                            'ei-lsyncd':        '13.0',
+                            'ei-cloudant':      '13.0',
+                            'ei-borgbackup':    '5.0',
+                            'ei-rclone':        '6.0' },
+
+              '22.0.1-0': { 'ei-base':          '17.0',
+                            'ei-wlp':           '28.0',
+                            'ei-wxs-server':    '4.0',
+                            'ei-wxs-client':    '8.0',
+                            'ei-ihs':           '29.1',
+                            'ei-nodejs':        '24.0',
+                            'ao_ibmjava':       '18.0',
+                            'ei-db2-server':    '23.0',
+                            'ei-db2-client':    '3.0',
+                            'ei-wmq-server':    '16.0',
+                            'ei-wmq':           '10.0',
+                            'ei-db2':           '5.0',
+                            'ao_apache':        '15.1',
+                            'ei-percona':       '17.0',
+                            'ei-php':           '10.0',
+                            'ei-ldap':          '18.0',
+                            'ei-haproxy':       '19.0',
+                            'ei-filebeat':      '12.0',
+                            'ei-logstash':      '23.0',
+                            'ei-elasticsearch': '14.0',
+                            'ei-cerebro':       '8.0',
+                            'ei-kafka':         '9.0',
+                            'ei-zookeeper':     '8.0',
+                            'ei-lsyncd':        '13.0',
+                            'ei-cloudant':      '12.0',
+                            'ei-borgbackup':    '5.0',
+                            'ei-rclone':        '6.0' },
+
+              '21.1.1-1': { 'ei-base':          '16.0',
+                            'ei-wlp':           '27.0.2',
+                            'ei-wxs-server':    '4.0',
+                            'ei-wxs-client':    '7.0',
+                            'ei-ihs':           '28.0',
+                            'ei-nodejs':        '23.0',
+                            'ao_ibmjava':       '17.0',
+                            'ei-db2-server':    '22.0',
+                            'ei-db2-client':    '2.0',
+                            'ei-wmq-server':    '15.0',
+                            'ei-wmq':           '10.0',
+                            'ei-db2':           '5.0',
+                            'ao_apache':        '14.0',
+                            'ei-percona':       '16.0',
+                            'ei-php':           '10.0',
+                            'ei-ldap':          '17.0',
+                            'ei-haproxy':       '18.0',
+                            'ei-filebeat':      '12.0',
+                            'ei-logstash':      '23.0',
+                            'ei-elasticsearch': '14.0',
+                            'ei-cerebro':       '8.0',
+                            'ei-kafka':         '9.0',
+                            'ei-zookeeper':     '8.0',
+                            'ei-lsyncd':        '13.0',
+                            'ei-cloudant':      '11.0',
+                            'ei-borgbackup':    '5.0',
+                            'ei-rclone':        '6.0' },
+
+              '21.1.1-0': { 'ei-base':          '16.0',
+                            'ei-wlp':           '27.0',
+                            'ei-wxs-server':    '4.0',
+                            'ei-wxs-client':    '7.0',
+                            'ei-ihs':           '28.0',
+                            'ei-nodejs':        '23.0',
+                            'ao_ibmjava':       '17.0',
+                            'ei-db2-server':    '22.0',
+                            'ei-db2-client':    '2.0',
+                            'ei-wmq-server':    '15.0',
+                            'ei-wmq':           '10.0',
+                            'ei-db2':           '5.0',
+                            'ao_apache':        '14.0',
+                            'ei-percona':       '16.0',
+                            'ei-php':           '10.0',
+                            'ei-ldap':          '17.0',
+                            'ei-haproxy':       '18.0',
+                            'ei-filebeat':      '12.0',
+                            'ei-logstash':      '23.0',
+                            'ei-elasticsearch': '14.0',
+                            'ei-cerebro':       '8.0',
+                            'ei-kafka':         '9.0',
+                            'ei-zookeeper':     '8.0',
+                            'ei-lsyncd':        '13.0',
+                            'ei-cloudant':      '11.0',
+                            'ei-borgbackup':    '5.0',
+                            'ei-rclone':        '6.0' },
+
+              '21.1.0': { 'ei-base':          '15.0',
+                          'ei-wlp':           '26.0',
+                          'ei-wxs-server':    '4.0',
+                          'ei-wxs-client':    '6.0',
+                          'ei-ihs':           '27.0',
+                          'ei-nodejs':        '22.0',
+                          'ao_ibmjava':       '16.0',
+                          'ei-db2-server':    '22.0',
+                          'ei-db2-client':    '2.0',
+                          'ei-wmq-server':    '15.0',
+                          'ei-wmq':           '10.0',
+                          'ei-db2':           '5.0',
+                          'ao_apache':        '13.0',
+                          'ei-percona':       '16.0',
+                          'ei-php':           '9.0',
+                          'ei-ldap':          '17.0',
+                          'ei-haproxy':       '16.0',
+                          'ei-filebeat':      '11.0',
+                          'ei-logstash':      '22.0',
+                          'ei-elasticsearch': '13.0',
+                          'ei-cerebro':       '7.0',
+                          'ei-kafka':         '8.1',
+                          'ei-zookeeper':     '7.0',
+                          'ei-lsyncd':        '12.0',
+                          'ei-cloudant':      '10.0',
+                          'ei-borgbackup':    '4.0',
+                          'ei-rclone':        '6.0' },
+
+              '21.0.1': { 'ei-base':          '13.0',
+                          'ei-wlp':           '25.0',
+                          'ei-wxs-server':    '2.0',
+                          'ei-wxs-client':    '5.0',
+                          'ei-ihs':           '26.0',
+                          'ei-nodejs':        '21.0',
+                          'ao_ibmjava':       '15.0',
+                          'ei-db2-server':    '21.0',
+                          'ei-db2-client':    '2.0',
+                          'ei-wmq-server':    '14.0',
+                          'ei-wmq':           '10.0',
+                          'ei-db2':           '5.0',
+                          'ao_apache':        '13.0',
+                          'ei-percona':       '15.0',
+                          'ei-php':           '9.0',
+                          'ei-ldap':          '16.0',
+                          'ei-haproxy':       '15.0',
+                          'ei-filebeat':      '11.0',
+                          'ei-logstash':      '22.0',
+                          'ei-elasticsearch': '13.0',
+                          'ei-cerebro':       '7.0',
+                          'ei-kafka':         '8.1',
+                          'ei-zookeeper':     '7.0',
+                          'ei-lsyncd':        '11.0',
+                          'ei-cloudant':      '7.0',
+                          'ei-borgbackup':    '3.0' },
+
+              '21.0.0': { 'ei-base':          '12.0',
+                          'ei-wlp':           '24.0',
+                          'ei-wxs-server':    '2.0',
+                          'ei-wxs-client':    '3.0',
+                          'ei-ihs':           '25.0',
+                          'ei-nodejs':        '20.0',
+                          'ao_ibmjava':       '14.0',
+                          'ei-db2-server':    '20.0',
+                          'ei-db2-client':    '2.0',
+                          'ei-wmq-server':    '14.0',
+                          'ei-wmq':           '10.0',
+                          'ei-db2':           '5.0',
+                          'ao_apache':        '12.0',
+                          'ei-percona':       '14.0',
+                          'ei-php':           '9.0',
+                          'ei-ldap':          '15.0',
+                          'ei-haproxy':       '14.0',
+                          'ei-filebeat':      '10.1',
+                          'ei-logstash':      '22.0',
+                          'ei-elasticsearch': '13.0',
+                          'ei-cerebro':       '7.0',
+                          'ei-kafka':         '8.1',
+                          'ei-zookeeper':     '6.2',
+                          'ei-lsyncd':        '11.0',
+                          'ei-cloudant':      '7.0',
+                          'ei-borgbackup':    '3.0' },
+
+              '20.1.1': { 'ei-base':          '11.0',
+                          'ei-wlp':           '23.0',
+                          'ei-wxs':           '22.0',
+                          'ei-wxs-server':    '1.1',
+                          'ei-wxs-client':    '2.0',
+                          'ei-ihs':           '25.0',
+                          'ei-nodejs':        '19.0',
+                          'ao_ibmjava':       '13.0',
+                          'ei-db2-server':    '19.0',
+                          'ei-db2-client':    '2.0',
+                          'ei-wmq-server':    '13.0',
+                          'ei-wmq':           '10.0',
+                          'ei-db2':           '5.0',
+                          'ao_apache':        '11.0',
+                          'ei-percona':       '13.0',
+                          'ei-php':           '8.0',
+                          'ei-ldap':          '15.0',
+                          'ei-haproxy':       '13.0',
+                          'ei-filebeat':      '10.1',
+                          'ei-logstash':      '21.0',
+                          'ei-elasticsearch': '12.1',
+                          'ei-cerebro':       '7.0',
+                          'ei-kafka':         '8.1',
+                          'ei-zookeeper':     '6.2',
+                          'ei-lsyncd':        '11.0',
+                          'ei-cloudant':      '7.0',
+                          'ei-borgbackup':    '2.0' },
+
+              '20.1.0': { 'ei-base':          '10.0',
+                          'ei-wlp':           '22.0',
+                          'ei-wxs':           '21.0',
+                          'ei-ihs':           '24.0',
+                          'ei-nodejs':        '18.0',
+                          'ao_ibmjava':       '12.0',
+                          'ei-db2-server':    '18.0',
+                          'ei-wmq-server':    '12.0',
+                          'ei-wmq':           '10.0',
+                          'ei-db2':           '5.0',
+                          'ao_apache':        '10.0',
+                          'ei-percona':       '12.0',
+                          'ei-php':           '8.0',
+                          'ei-ldap':          '15.0',
+                          'ei-haproxy':       '12.0',
+                          'ei-filebeat':      '10.0',
+                          'ei-logstash':      '20.0',
+                          'ei-elasticsearch': '12.0',
+                          'ei-cerebro':       '7.0',
+                          'ei-kafka':         '8.0',
+                          'ei-zookeeper':     '6.0',
+                          'ei-lsyncd':        '11.0',
+                          'ei-cloudant':      '6.0' } }.freeze
+
+report_type = :default
+
+parser = OptionParser.new do |opts|
+  opts.banner = 'Usage: offering_report [options]'
+
+  opts.on('--sr', 'Generate SRs for owners with nodes below current offering cookbook versions') do
+    report_type = :sr
+  end
+
+  opts.on('--email', 'Generate emails for owners with nodes below current offering cookbook versions') do
+    report_type = :email
+  end
+
+  opts.on('-o', '--owner', 'Generate offering report organized by owner') do
+    report_type = :owner
+  end
+
+  opts.on('-s', '--summary', 'Only show summary report table (not valid with any other options)') do
+    report_type = :summary
+  end
+
+  opts.on('-v', '--version VERSION', 'Only report report on specified offering version (does not affect summary table)') do |arg|
+    LATEST_OFFERING = arg.to_sym
+  end
+
+  opts.on_tail('--help', 'Show this message') do
+    puts opts
+    exit(1)
+  end
+end
+
+begin
+  parser.parse!
+rescue OptionParser::MissingArgument
+  parser.parse('--help')
+rescue OptionParser::ParseError => e
+  abort "Error: #{e}"
+end
+
+#
+# HashTree provides autovivification (i.e. initialization) of arbitrairly deep hash of hashes
+#
+class HashTree < Hash
+  def initialize
+    super do |hash, key|
+      hash[key] = HashTree.new
+    end
+  end
+end
+
+#
+# Determine latest offering
+#
+LATEST_OFFERING ||= OFFERINGS.keys.min { |a, b| -1 * (Gem::Version.new(a) <=> Gem::Version.new(b)) }
+
+#
+# List of all cookbooks ever in any offering
+#
+COOKBOOKS = OFFERINGS.keys.map { |ver| OFFERINGS[ver].keys }.flatten.uniq
+
+# Get owners
+OWNERS = Hash[`eilssys -a -l primaryownername -x csv -q`.scan(/^(\S+),(\S+)$/)].each { |_node, owner| owner.downcase! }
+abort 'Error: `eilssys -a -l primaryownername -x csv -q` failed' if $CHILD_STATUS.exitstatus != 0 || OWNERS.nil? || OWNERS.empty?
+
+#
+# Get all cookbook version information for every node from Chef server
+#
+search_attrs = COOKBOOKS.map { |cb| "-a cookbooks.#{cb}.version" }.join(' ')
+cmd = "knife search node 'name:*' #{search_attrs} -a run_list -F json"
+json = JSON.parse(`#{cmd}`)
+
+z1_nodes = `eidist -u root -g 32 -c "role==CLOUDOPS realm==*z1*" '[[ -s /etc/.oldchefversion ]] && echo || true' -m -p`
+if $CHILD_STATUS.exitstatus.zero?
+  z1_nodes.split(": \n").each do |node|
+    z1_cbs = {}
+    z1_json = JSON.parse(`ssh #{node} cat /etc/.oldchefversion`)
+    next unless z1_json['automatic']['cookbooks']
+    z1_json['automatic']['cookbooks'].each do |cookbook, version|
+      version.each do |_, v|
+        next unless COOKBOOKS.include?(cookbook.to_sym)
+        z1_cbs['cookbooks.' + cookbook] = v
+      end
+    end
+    z1_cbs['run_list'] = z1_json['run_list']
+    json['rows'] << { z1_json['name'] => z1_cbs }
+  end
+end
+
+NODE_RUN_LISTS = HashTree.new
+OFFERING_STATUS = HashTree.new
+NODE_STATUS = HashTree.new
+
+#
+# Process all the run_list entries first
+#
+json['rows'].each do |row|
+  row.reject { |node, _| node == 'ei_readonly' }
+     .each do |node, cookbook_versions|
+    cookbook_versions.select { |cb_key, version| cb_key == 'run_list' && version.any? }
+                     .each do |_, version|
+      NODE_RUN_LISTS[node] = version[0][/(?<=\[).*(?=\])/]
+    end
+  end
+end
+
+#
+# Process all the cookbook version info for the nodes against the offering cookboook min versions
+#
+json['rows'].each do |row|
+  row.reject { |node, _| node == 'ei_readonly' }
+     .each do |node, cookbook_versions|
+    min_matched_offering = '999.999.999' # Just a big placeholder value
+
+    cookbook_versions.reject { |cb_key, version| cb_key == 'run_list' || version.nil? }
+                     .each do |cb_key, version|
+      (_, cb,) = cb_key.split('.')
+      cookbook = cb.to_sym
+
+      #
+      # Find the first (i.e. latest) offering that this particular cookbook version satifies
+      #
+      tmp = OFFERINGS.detect { |_, cookbook_mins| cookbook_mins[cookbook].nil? ? false : Gem::Version.new(version) >= Gem::Version.new(cookbook_mins[cookbook]) }
+      matched_offering = tmp.nil? ? :'0.0.0' : tmp.first.to_sym # Note: 0.0.0 represents anything earlier than
+      #                                                                 oldest offering in the OFFERINGS hash
+
+      # Record actual node and cookbook version for this matched offering
+      OFFERING_STATUS[matched_offering][cookbook][node] = version
+
+      # Record list of nodes by owner and run_list (i.e. role cookbook)
+      NODE_STATUS[OWNERS[node]][NODE_RUN_LISTS[node]][node][cookbook] = version if Gem::Version.new(matched_offering) < Gem::Version.new(LATEST_OFFERING)
+
+      # Need to determine oldest offering matched
+      min_matched_offering = matched_offering if Gem::Version.new(matched_offering) < Gem::Version.new(min_matched_offering)
+    end
+
+    # if min_matched_offering is still 999.999.999 that indicates a node with no cookbook data
+    #   e.g. a failed provision or currently in the middle of a provision
+    # so just ignore them
+    OFFERING_STATUS[min_matched_offering][:overall][node] = 1 if min_matched_offering != '999.999.999'
+  end
+end
+
+#
+# Get latest version of every cookbook
+#
+tmp = `knife cookbook list`.split
+abort 'Error: `knife cookbook list` failed' if $CHILD_STATUS.exitstatus != 0 || tmp.nil? || tmp.empty?
+LATEST_VERSIONS = Hash[*tmp]
+
+unless report_type == :owner
+  #
+  # Reprocess all the cookbook version info for the 99.99.99 (aka "vs latest") column
+  #
+  # Note: the 99.99.99/"vs latest" offering version counts are a double count vs the other offering version columns.
+  #
+  json['rows'].each do |row|
+    row.reject { |node, _| node == 'ei_readonly' }
+       .each do |node, cookbook_versions|
+      min_matched_offering = '999.999.999'
+
+      cookbook_versions.reject { |cb_key, version| cb_key == 'run_list' || version.nil? }
+                       .each do |cb_key, version|
+        (_, cb,) = cb_key.split('.')
+        cookbook = cb.to_sym
+
+        if Gem::Version.new(version) >= Gem::Version.new(LATEST_VERSIONS[cookbook.to_s])
+          matched_offering = :'99.99.99'
+          OFFERING_STATUS[:'99.99.99'][cookbook][node] = version
+        else
+          matched_offering = :'0.0.0'
+        end
+
+        min_matched_offering = matched_offering if Gem::Version.new(matched_offering) < Gem::Version.new(min_matched_offering)
+      end
+
+      OFFERING_STATUS[min_matched_offering][:overall][node] = 1 if min_matched_offering == :'99.99.99'
+    end
+  end
+end
+
+def table_bar
+  puts "+-#{@columns.map { |width| '-' * width }.join('-+-')}-+"
+end
+
+def write_line(key, values)
+  if key == 'Overall'
+    b = '<b>'
+    bc = '</b>'
+  end
+  str = "<tr id='wanted'><td>#{b}#{key.to_s.ljust(@columns[0])}#{bc}</td>\n"
+  values.each_with_index do |val, i|
+    str += "  <td>#{b}" + val.to_s.rjust(@columns[i + 1]) + "#{bc}</td>\n"
+  end
+  puts "#{str}</tr>"
+end
+
+def row_count(keys, cookbook)
+  keys.map { |v| OFFERING_STATUS[v][cookbook].keys.count } + [keys.reject { |v| v == :'99.99.99' }.map { |v| OFFERING_STATUS[v][cookbook].keys.count }.inject(0, :+)]
+end
+
+def titles(keys)
+  keys.map { |k| k == :'99.99.99' ? 'vs latest' : k } + ['Totals']
+end
+
+def columns
+  tmp = [COOKBOOKS.max_by(&:length).length]
+  OFFERING_STATUS.keys.count.times { tmp << 9 }
+  tmp << 9
+  tmp
+end
+
+def sorted_offering_status_keys
+  OFFERING_STATUS.keys.sort { |a, b| -1 * (Gem::Version.new(a) <=> Gem::Version.new(b)) }
+end
+
+def summary_header(keys)
+  puts '<table id="summary" class="summary" style="display: none;"><thead><tr style="cursor:pointer;"><td onclick=\'sortTable(0,"summary");\'>Cookbook</td>'
+  titles(keys).each_with_index do |val, i|
+    puts "<td onclick='sortTable(#{i + 1},\"summary\");'>#{val}</td>"
+  end
+  puts '</tr></thead><tbody>'
+end
+
+#
+# Displays a summary table of the counts of nodes at the various offering versions
+#
+def summary_table
+  @columns = columns
+
+  keys = sorted_offering_status_keys
+
+  opening_html
+  summary_header(keys)
+  COOKBOOKS.each do |cb|
+    write_line(cb, row_count(keys, cb))
+  end
+  write_line('Overall', row_count(keys, :overall))
+  puts '</tbody></table>'
+end
+
+def sorted_offering_keys
+  OFFERINGS.keys.reject { |v| Gem::Version.new(v) >= Gem::Version.new(LATEST_OFFERING) }
+           .sort { |a, b| -1 * (Gem::Version.new(a) <=> Gem::Version.new(b)) }
+end
+
+def group_cookbooks
+  hash = HashTree.new
+
+  COOKBOOKS.each do |cb|
+    sorted_offering_keys.each do |o|
+      OFFERING_STATUS[o][cb].each do |n, v|
+        hash[cb]["#{NODE_RUN_LISTS[n]} (#{cb}@#{v}) #{OWNERS[n]}"][n] = 1
+      end
+    end
+  end
+
+  hash
+end
+
+def cookbook_count(cookbook)
+  cookbook.map { |_, v| v.keys.count }.inject(:+)
+end
+
+def cookbook_header(cb_list, cookbook)
+  puts "\n" + '-' * 90
+  tmp = OFFERINGS[LATEST_OFFERING][cookbook].nil? ? '99.99.99' : OFFERINGS[LATEST_OFFERING][cookbook]
+  puts "Cookbook: #{cookbook} < #{tmp} = #{cookbook_count(cb_list[cookbook])}   (latest: #{LATEST_VERSIONS[cookbook.to_s]})\n\n"
+end
+
+def role_cb_line(role_cb_info, nodes)
+  puts "#{role_cb_info} #{nodes.keys.join(' ')}"
+end
+
+#
+# Displays which role cookbooks/nodes are downlevel vs latest offering by offering cookbook
+#
+def by_cookbook_report
+  cb_list = group_cookbooks
+
+  COOKBOOKS.reject { |cb| cb_list[cb].empty? }
+           .each do |cb|
+    cookbook_header(cb_list, cb)
+    cb_list[cb].keys.sort.each do |tmp|
+      role_cb_line(tmp, cb_list[cb][tmp])
+    end
+  end
+end
+
+def one_role_cookbook(cookbook, ver, display_latest, indent = false)
+  output = ''
+  output += '    ' if indent
+  output += "#{cookbook.to_s.ljust(17)} #{ver.rjust(6)}"
+  output += if OFFERINGS[LATEST_OFFERING][cookbook].nil?
+              display_latest ? " - cookbook is no longer supported\n" : "\n"
+            else
+              display_latest ? " - update to at least #{OFFERINGS[LATEST_OFFERING][cookbook].rjust(4)} (recommended is latest: #{LATEST_VERSIONS[cookbook.to_s]})\n" : "\n"
+            end
+  output
+end
+
+def role_cookbook_list_plain(role_cbs, display_latest = false)
+  output = ''
+
+  role_cbs.each do |role_cb, nodes|
+    output += "  #{role_cb}: #{nodes.keys.join(', ')}\n\n"
+    nodes.first[1].each do |cb, ver|
+      output += one_role_cookbook(cb, ver, display_latest, true)
+    end
+    output += "\n"
+  end
+
+  output
+end
+
+def role_cookbook_list(role_cbs, email, display_latest = false)
+  output = ''
+
+  role_cbs.each do |role_cb, nodes|
+    output += '<tr id="wanted">' + "<td>#{role_cb.split('@')[0]}</td><td>#{role_cb.split('@')[1]}</td><td>#{nodes.keys.join(', ')}</td>"
+    output += '<td><pre>'
+    nodes.first[1].each do |cb, ver|
+      output += one_role_cookbook(cb, ver, display_latest)
+    end
+    output += "</pre></td><td>#{email}</td></tr>"
+  end
+
+  output
+end
+
+#
+# Displays which role cookbooks/nodes are downlevel vs latest offering by owner
+#
+# rubocop:disable Metrics/MethodLength
+# rubocop:disable Metrics/AbcSize
+def by_owner_report
+  puts '<p><em>Note: each column is sortable and all table text can be filtered</em></p><input id="sde_filter" type="text" placeholder="Enter text/regex to filter on..." style="width:300px;font-size:14px;">'
+  # rubocop:disable Metrics/LineLength
+  puts '<span style="font-size:14px;">(<span id="count"></span><img id="waiting" src="data:image/gif;base64,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">)</span>'
+  puts '<span style="float:right;font-size:14px;"><span style="color:#a9a9a9">Last updated on <em>' + Time.now.strftime('%a %b %d %H:%M:%S %Z %Y') + '</em></span></span>'
+  puts '<table id="cookbooks"><thead><tr style="cursor:pointer;">'
+  puts '<td onclick="sortTable(0,\'cookbooks\');" style="min-width: 30ch;">Cookbook</td><td onclick="sortTable(1,\'cookbooks\');">Version</td><td onclick="sortTable(2,\'cookbooks\');">Nodes</td><td onclick="sortTable(3,\'cookbooks\');" style="min-width: 70ch;">Required Action</td><td onclick="sortTable(4,\'cookbooks\');">Owner</td>'
+  # rubocop:enable Metrics/LineLength
+  puts '</tr></thead><tbody id="tbody">'
+
+  if NODE_STATUS.empty?
+    puts '<tr id="wanted"><td colspan="5"><span style="color: green">All cookbooks are at the latest offering.</span><br><br>Gold star to everyone <span style="color:gold;">&starf;</span> but <em>now</em> what\'s Todd going to talk about on the DC? &#128521;</td></tr>'
+  else
+    NODE_STATUS.each do |email, role_cbs|
+      puts role_cookbook_list(role_cbs, email, true)
+    end
+  end
+  puts '</tbody></table></div></body></html>'
+end
+# rubocop:enable Metrics/MethodLength
+# rubocop:enable Metrics/AbcSize
+
+def standard_blurb(role_cbs)
+  output = "The following cookbooks have dependencies on versions that are below those required for our current offering #{LATEST_OFFERING}:\n\n"
+  role_cbs.each do |role_cb, _nodes|
+    output += "    #{role_cb}\n"
+  end
+  output += "\n\nDetails:\n\n"
+  output += role_cookbook_list_plain(role_cbs)
+  output += "Please update your role cookbooks and deploy before #{DUE_DATE} but preferably as soon as possible.  It is recommended that you upgrade to the latest versions (see https://w3.event.ibm.com/ei/sde/offering_report)."
+  output
+end
+
+#
+# Generates an SR per owner for all role cookbooks/nodes that are downlevel vs latest offering
+#
+def generate_srs
+  NODE_STATUS.each do |email, role_cbs|
+    puts "Generating SR for #{email}..."
+
+    tmp = `/usr/local/bin/createIssue --type sr --assignee #{email} --request-by #{DUE_DATE} --subject "Cookbook updates needed for offering #{LATEST_OFFERING}" --body "#{standard_blurb(role_cbs)}"`
+    puts tmp
+  end
+end
+
+def send_email(email, subject, body)
+  from = "root@#{Socket.gethostname}"
+
+  message = <<MESSAGE_END
+From: Chef Server <#{from}>
+To: #{email}
+Subject: #{subject}
+
+#{body}
+MESSAGE_END
+
+  Net::SMTP.start('localhost') do |smtp|
+    smtp.send_message(message, from, email)
+  end
+end
+
+#
+# Generates an email per owner for all role cookbooks/nodes that are downlevel vs latest offering
+#
+def send_emails
+  NODE_STATUS.each do |email, role_cbs|
+    puts "Generating email for #{email}..."
+
+    send_email(email, "AOHCS Cookbook updates needed for offering #{LATEST_OFFERING}", standard_blurb(role_cbs))
+  end
+end
+
+def opening_html
+  puts <<-END_HTML
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<link rel="SHORTCUT ICON" href="//w3.ibm.com/favicon.ico"/>
+<meta name="Keywords" content="Continuous Availability Services, Events Infrastructure, CAS-EI, EI, The EI, Special Events"/>
+<meta name="Owner" content="Keith White"/>
+<meta name="Feedback" content="Keith.White\@kyndryl.com"/>
+<meta name="Description" content="Always-On Hybrid Cloud Services - Offering Report"/>
+
+<title>AOHCS Offering Report</title>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+<script type="text/javascript">
+function sortTable(n,tableid) {
+    sort_table(document.getElementById(tableid), n);
+}
+
+var asc = 0;
+function sort_table(table, col) {
+    $('.sortorder').remove();
+    if (asc == 2) {asc = -1;} else {asc = 2;}
+    var rows = table.tBodies[0].rows;
+    var rlen = rows.length;
+    var arr = new Array();
+    var i, j, cells, clen;
+    // fill the array with values from the table
+    for(i = 0; i < rlen; i++) {
+        cells = rows[i].cells;
+        clen = cells.length;
+        arr[i] = new Array();
+        for(j = 0; j < clen; j++) { arr[i][j] = cells[j].innerHTML; }
+    }
+    // sort the array by the specified column number (col) and order (asc)
+    arr.sort(function(a, b) {
+        var retval=0;
+        var col1 = a[col].toLowerCase();
+        var col2 = b[col].toLowerCase();
+        if(col1 != col2) {
+            retval=(col1 > col2) ? asc : -1*asc;
+        }
+        return retval;
+    });
+    // populate the table with the new sorted values
+    for(var rowidx=0;rowidx<rlen;rowidx++) {
+        for(var colidx=0;colidx<arr[rowidx].length;colidx++){
+            table.tBodies[0].rows[rowidx].cells[colidx].innerHTML=arr[rowidx][colidx];
+        }
+    }
+    // add sort arrows to column heading
+    hdr = table.rows[0].cells[col];
+    if (asc == -1) {
+        $(hdr).html($(hdr).html() + '<span class="sortorder">▲</span>');
+    } else {
+        $(hdr).html($(hdr).html() + '<span class="sortorder">▼</span>');
+    }
+    filterTable();
+}
+
+function filterTable() {
+    var value = $("#sde_filter").val().toLowerCase();
+    var re = new RegExp(value, "im");
+    var count = 0;
+    var total = 0;
+    $("#tbody tr").filter(function() {
+        total ++;
+        var wanted = $(this).is("#wanted");
+            if (re.test($(this).text()) && wanted) {
+               $(this).show();
+               count++;
+           } else {
+               $(this).hide();
+           }
+    });
+    $("#count").text(count+"/"+total+" rows shown");
+    $("#waiting").hide();
+}
+
+function toggle_summary() {
+  var s = document.getElementById('summary');
+  if (s.style.display == 'table') {
+    s.style.display = 'none';
+    document.getElementById('show_hide').innerHTML="show";
+  }
+  else {
+    s.style.display = 'table';
+    document.getElementById('show_hide').innerHTML="hide";
+  }
+}
+
+$(document).ready(function(){
+    // get any query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+
+    if (urlParams.get('search')) {
+        $("#sde_filter").val(urlParams.get('search'));
+    }
+    $("#sde_filter").on("keyup", function(){ filterTable(); });
+    filterTable();
+});
+</script>
+
+<style>
+body {
+    font-family: IBMPlexSans,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size: 16px;
+    font-weight: normal;
+    padding: 10px;
+    line-height: 1.2;
+    color: #232323;
+}
+p {
+    -moz-osx-font-smoothing: grayscale;
+}
+h1, h3 {
+    margin: 0px 0px 8px 0px;
+}
+table {
+  font-size: 13px;
+  border-collapse: collapse;
+  width: 100%;
+  font-family: Arial, sans-serif;
+  line-height: 1.2;
+  color: #333;
+}
+thead {
+    background-color: #ededed;
+    font-weight: bold;
+}
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  font-size: 13px;
+  padding: 8px;
+  vertical-align: baseline;
+  font-family: Arial, sans-serif;
+  line-height: 1.2;
+  color: #333;
+}
+.summary td {
+    line-height: 0;
+}
+</style>
+</head>
+
+<body>
+<h1>AOHCS Offering Report</h1>
+<div>
+    <p>The following table shows the actions required to bring nodes up to the latest offering - <b>#{LATEST_OFFERING}</b> (<a href='#' onclick='toggle_summary();'><span id="show_hide">show</span></a> summary table of core cookbooks)
+  END_HTML
+end
+
+#
+# Main
+#
+case report_type
+when :default
+  summary_table
+  by_cookbook_report
+when :summary
+  summary_table
+when :owner
+  summary_table
+  by_owner_report
+when :sr
+  generate_srs
+when :email
+  send_emails
+else
+  abort "Error: no such report type: #{report_type}"
+end
